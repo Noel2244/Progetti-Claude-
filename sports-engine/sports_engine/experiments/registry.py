@@ -23,14 +23,21 @@ HASHED_FIELDS = ("experiment_id", "version", "parent_id", "family", "name", "hyp
                  "validation_period", "test_period", "used_holdout", "n_candidates", "metrics", "notes")
 
 
+CODE_PATHS = ("sports_engine", "config.yaml", "pyproject.toml")
+
+
 def code_version(root: Path | None = None) -> str:
-    """Git commit (+'-dirty' when there are uncommitted changes); 'unknown' outside git."""
+    """Git commit (+'-dirty' when code or config differ from it); 'unknown' outside git.
+
+    Only paths that can change results count: untracked reports or docs do not make a run dirty.
+    """
     try:
         cwd = str(root) if root else None
         head = subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True, text=True, cwd=cwd, timeout=10, check=False)
         if head.returncode != 0:
             return "unknown"
-        dirty = subprocess.run(["git", "status", "--porcelain"], capture_output=True, text=True, cwd=cwd, timeout=10, check=False)
+        dirty = subprocess.run(["git", "status", "--porcelain", "--", *CODE_PATHS], capture_output=True, text=True,
+                               cwd=cwd, timeout=10, check=False)
         return head.stdout.strip()[:12] + ("-dirty" if dirty.stdout.strip() else "")
     except (OSError, subprocess.SubprocessError):
         return "unknown"
