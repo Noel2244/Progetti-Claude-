@@ -22,11 +22,31 @@ from sklearn.isotonic import IsotonicRegression
 from sports_engine.calibration.metrics import log_loss
 
 EPS = 1e-6
+# Floor for the output of every fitted (non-identity) calibrator. Isotonic step functions can emit
+# ~0 probabilities at the edge of their training range; in the Serie A backtest one such output
+# (1e-6 for outcomes that then happened) turned a 0.969 log-loss season into 1.030.
+PROB_FLOOR = 0.01
 
 
 def _clip(P: np.ndarray) -> np.ndarray:
     P = np.clip(np.asarray(P, float), EPS, 1.0)
     return P / P.sum(axis=1, keepdims=True)
+
+
+def _floor(Q: np.ndarray, floor: float = PROB_FLOOR) -> np.ndarray:
+    """Exact probability floor: entries below ``floor`` are pinned at it and only the others are
+    rescaled (water-filling), so the result is >= floor everywhere and still sums to 1."""
+    Q = np.clip(np.asarray(Q, float), 0.0, None)
+    Q = Q / Q.sum(axis=1, keepdims=True)
+    out = Q.copy()
+    for _ in range(Q.shape[1]):
+        pinned = out < floor
+        free_mass = 1.0 - floor * pinned.sum(axis=1, keepdims=True)
+        free_sum = np.where(pinned, 0.0, Q).sum(axis=1, keepdims=True)
+        out = np.where(pinned, floor, Q * free_mass / np.where(free_sum > 0, free_sum, 1.0))
+        if not (out < floor - 1e-12).any():
+            break
+    return out
 
 
 class Calibrator:
@@ -68,7 +88,7 @@ class TemperatureScaling(Calibrator):
         return self
 
     def transform(self, P):
-        return softmax(np.log(_clip(P)) / self.T, axis=1)
+        return _floor(softmax(np.log(_clip(P)) / self.T, axis=1))
 
     def params(self):
         return {"T": self.T}
@@ -109,7 +129,7 @@ class DirichletCalibrator(Calibrator):
         return self
 
     def transform(self, P):
-        return softmax(np.log(_clip(P)) @ self.W.T + self.b, axis=1)
+        return _floor(softmax(np.log(_clip(P)) @ self.W.T + self.b, axis=1))
 
     def params(self):
         return {"W": self.W.round(4).tolist(), "b": self.b.round(4).tolist()}
@@ -131,7 +151,7 @@ class OvRIsotonic(Calibrator):
     def transform(self, P):
         P = _clip(P)
         Q = np.column_stack([m.predict(P[:, k]) for k, m in enumerate(self.models)])
-        return _clip(Q)
+        return _floor(Q)
 
 
 class OvRPlatt(Calibrator):
@@ -151,7 +171,7 @@ class OvRPlatt(Calibrator):
         from scipy.special import expit
         P = _clip(P)
         Q = np.column_stack([expit(a + b * logit(P[:, k])) for k, (b, a) in enumerate(self.ab)])
-        return _clip(Q)
+        return _floor(Q)
 
 
 CALIBRATORS = {c.name: c for c in (IdentityCalibrator, TemperatureScaling, DirichletCalibrator, OvRIsotonic, OvRPlatt)}

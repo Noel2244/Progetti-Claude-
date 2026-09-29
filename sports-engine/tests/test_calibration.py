@@ -86,3 +86,14 @@ def test_paired_bootstrap_detects_difference():
     assert r["ci_high"] < 0 and r["p_a_better"] > 0.99
     r2 = paired_bootstrap(a, a + rng.normal(0, 0.05, 2000), 500, 0, blocks=np.arange(2000) // 10)
     assert r2["ci_low"] < 0 < r2["ci_high"]
+
+
+@pytest.mark.parametrize("name", [n for n in CALIBRATORS if n != "identity"])
+def test_fitted_calibrators_never_emit_near_zero_probabilities(name):
+    """Regression: isotonic produced 1e-6 for outcomes that happened (log loss 13.7 each)."""
+    rng = np.random.default_rng(5)
+    P = rng.dirichlet([4, 2, 3], size=800)
+    y = np.where(P[:, 1] < 0.12, 0, np.array([rng.choice(3, p=p) for p in P]))   # draws never happen at low p in training
+    c = CALIBRATORS[name]().fit(P, y)
+    Q = c.transform(np.array([[0.90, 0.02, 0.08], [0.05, 0.05, 0.90]]))
+    assert Q.min() >= 0.01 - 1e-12 and np.allclose(Q.sum(axis=1), 1)
