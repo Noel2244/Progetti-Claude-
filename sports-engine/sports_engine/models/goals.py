@@ -23,7 +23,7 @@ import pandas as pd
 from scipy.optimize import minimize
 
 from sports_engine.models.base import MatchOutcomeModel, MatchPrediction
-from sports_engine.models.score_matrix import DerivedMarkets, one_x_two_batch, score_matrix
+from sports_engine.models.score_matrix import BATCH_MARKETS, DerivedMarkets, markets_batch, score_matrix
 from sports_engine.pit.store import PITSnapshot
 
 
@@ -265,10 +265,10 @@ class GoalModel(MatchOutcomeModel):
                 cv = float(row_h @ self.cov @ row_a)
                 cov2 = np.array([[var_h, cv], [cv, var_a]])
                 eta = rng.multivariate_normal([np.log(lh), np.log(la)], cov2, size=p.n_draws, check_valid="ignore")
-                sims = one_x_two_batch(np.exp(eta[:, 0]), np.exp(eta[:, 1]), rho, p.max_goals)
+                sims = markets_batch(np.exp(eta[:, 0]), np.exp(eta[:, 1]), rho, p.max_goals)
                 lo, hi_ = np.percentile(sims, [5, 95], axis=0)
-                interval = {k: (float(lo[i]), float(hi_[i])) for i, k in enumerate("HDA")}
-                sd = {k: float(sims[:, i].std()) for i, k in enumerate("HDA")}
+                interval = {k: (float(lo[i]), float(hi_[i])) for i, k in enumerate(BATCH_MARKETS)}
+                sd = {k: float(sims[:, i].std()) for i, k in enumerate(BATCH_MARKETS)}
             notes = []
             for t in (r.home_team_id, r.away_team_id):
                 if t not in self.idx:

@@ -31,6 +31,7 @@ def run_backtest(settings: Settings, db: Database, *, competitions: list[str], t
                  use_holdout: bool = False, holdout_reason: str | None = None, family: str = "baseline_models",
                  name: str | None = None, overrides: dict | None = None, bootstrap: int = 1000,
                  save_calibrators: bool = True, hypothesis: str | None = None) -> dict:
+    cv = code_version(settings.root)   # the code that runs is the code at start (not at the end)
     holdout = settings.get("holdout.start_date")
     holdout_start = date.fromisoformat(holdout) if holdout else None
     registry = ExperimentRegistry(db)
@@ -52,7 +53,6 @@ def run_backtest(settings: Settings, db: Database, *, competitions: list[str], t
     )
     result = WalkForwardBacktest(store, cfg, model_factories(settings, overrides)).run()
     fp = dataset_fingerprint(db, competitions)
-    cv = code_version(settings.root)
     sources = sorted({s for js in db.df(
         f"SELECT sources FROM match WHERE competition_id IN ({','.join('?' * len(competitions))})", competitions)["sources"]
         for s in json.loads(js)})
@@ -111,7 +111,8 @@ def save_live_calibrators(settings: Settings, result: BacktestResult, dataset_fp
                "fitted_on": {"n": int(len(g)), "seasons": [int(s) for s in seasons],
                              "last_decision_time": str(pd.Timestamp(g["decision_time"].max()))},
                "selection": {"method": choice.method, "reason": choice.reason,
-                             "validation_logloss": {k: float(v) for k, v in choice.validation.items()}},
+                             "validation_logloss": {k: (float(v) if not isinstance(v, list) else v)
+                                                    for k, v in choice.validation.items()}},
                "calibrator": calibrator_to_dict(cal)}
         (out_dir / f"{model}.json").write_text(json.dumps(doc, indent=1), encoding="utf-8")
         saved[model] = choice.method

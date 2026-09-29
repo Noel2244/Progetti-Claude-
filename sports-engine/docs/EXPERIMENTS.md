@@ -35,4 +35,5 @@ robustness (majority of seasons), depends on fragile features, or needs prohibit
 python -m sports_engine experiments           # stats, recent runs, integrity check
 python -m sports_engine gates --run-id <id> --model dixon_coles --reference elo
 python -m sports_engine gates --run-id <id> --model dixon_coles --reference elo --promote
+python -m sports_engine nested --model dixon_coles --param xi_per_day=0,0.001,0.0019,0.003 --outer 2015-2024
 ```

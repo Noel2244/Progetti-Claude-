@@ -109,3 +109,11 @@ def test_experiment_registry_immutable_and_verifiable(db):
     assert reg.log_holdout_access(e1, "2025-07-01", "final confirmation of champion") == 1
     with pytest.raises(sqlite3.DatabaseError):
         db.execute("DELETE FROM holdout_access")
+
+
+def test_paper_over_under_has_real_interval(paper_env):
+    settings, db, _ = paper_env
+    PaperEngine(settings, db).run(now=datetime(2021, 11, 3, 12, 0, tzinfo=timezone.utc))
+    ou = db.df("SELECT prob_low, prob_high, model_prob FROM paper_prediction WHERE market='OU'")
+    assert len(ou) and ou["prob_low"].notna().all()
+    assert (ou["prob_high"] - ou["prob_low"] > 0).all()

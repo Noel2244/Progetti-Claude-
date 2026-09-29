@@ -24,7 +24,7 @@ import pandas as pd
 
 from sports_engine.calibration.calibrators import IdentityCalibrator, calibrator_from_dict
 from sports_engine.core.config import Settings
-from sports_engine.core.enums import DecisionStatus
+from sports_engine.core.enums import SOURCE_TIER_RELIABILITY, DecisionStatus, Freshness
 from sports_engine.core.hashing import canonical_json, sha256_bytes, short_id, stable_hash
 from sports_engine.core.logging import get_logger, log_event
 from sports_engine.core.timeutils import ensure_utc, iso, utcnow
@@ -34,12 +34,14 @@ from sports_engine.decision.staking import RiskLimits, StakingConfig, apply_risk
 from sports_engine.entity.competitions import get_competition
 from sports_engine.features.team_features import FEATURE_VERSION, build_team_features
 from sports_engine.market.clv import clv_fair, clv_price
-from sports_engine.market.consensus import market_view
+from sports_engine.market.consensus import market_view, odds_freshness
+from sports_engine.models.champion import ModelRegistry
 from sports_engine.models.registry import STATISTICAL_MODELS, model_factories
 from sports_engine.models.score_matrix import DerivedMarkets
 from sports_engine.pit.cutoffs import kickoff_or_none
 from sports_engine.pit.store import HistoricalStore
-from sports_engine.quality.scoring import composite
+from sports_engine.providers.registry import PROVIDER_CLASSES
+from sports_engine.quality.scoring import WEIGHTS, composite
 from sports_engine.uncertainty.agreement import combined_interval, model_agreement
 
 log = get_logger("paper")
@@ -86,15 +88,23 @@ class PaperEngine:
                 prev = r["row_hash"]
         return len(rows)
 
-    def _match_quality(self, fx, hist_h: int, hist_a: int, overdue: int, mv) -> tuple[float, dict]:
+    def _match_quality(self, fx, hist_h: int, hist_a: int, overdue: int, mv, meta: dict | None, now) -> tuple[float, dict]:
+        """Components are measured, never assumed (see quality/scoring.py)."""
+        meta = meta or {}
+        tier = PROVIDER_CLASSES[meta["primary_source"]].info.source_tier if meta.get("primary_source") in PROVIDER_CLASSES else None
         comps = {
             "timestamp_quality": 1.0 if kickoff_or_none(fx.kickoff_utc) else 0.5,
-            "completeness": min(1.0, min(hist_h, hist_a) / 30.0),
-            "freshness": max(0.0, 1.0 - overdue / 10.0),
-            "consistency": 1.0,
-            "source_reliability": 0.7,
+            "completeness": min(1.0, min(hist_h, hist_a) / 30.0),        # team history available to the model
+            "freshness": max(0.0, 1.0 - overdue / 10.0),                  # overdue results in the data
+            "consistency": 0.5 if meta.get("has_conflict") else 1.0,
+            "source_reliability": SOURCE_TIER_RELIABILITY[tier] if tier is not None else None,
+            "corroboration": min(1.0, max(0, (meta.get("n_sources") or 1) - 1)) if meta else None,
         }
-        q = composite(comps)
+        if mv is not None and mv.newest_at is not None:
+            comps["odds_freshness"] = {Freshness.FRESH: 1.0, Freshness.AGING: 0.7, Freshness.STALE: 0.2,
+                                       Freshness.UNKNOWN: 0.0}[odds_freshness(mv.newest_at, now)]
+        weights = dict(WEIGHTS, odds_freshness=0.10)
+        q = composite(comps, weights)
         return q.score, q.as_dict()
 
     # ---------------------------------------------------------------- run
@@ -136,6 +146,15 @@ class PaperEngine:
         feats = build_team_features(snap, fixtures, comps)
         dcfg, scfg, limits = DecisionConfig.from_settings(self.s), StakingConfig.from_settings(self.s), RiskLimits.from_settings(self.s)
         latest = self._latest_versions()
+        champ = ModelRegistry(self.db).champion()
+        champ_gates = json.loads(champ["gates"] or "{}") if champ else {}
+        validated = bool(champ and champ["name"] == primary and champ_gates.get("betting_eligible"))
+        ids = list(fixtures["match_id"])
+        match_meta = {r["match_id"]: r for r in self.db.query(
+            f"SELECT match_id, primary_source, n_sources, has_conflict FROM match WHERE match_id IN ({','.join('?' * len(ids))})", ids)}
+        drift_alert = bool(self.db.scalar(
+            """SELECT COUNT(*) FROM drift_record WHERE status='ALERT' AND scope LIKE ? AND computed_at = (
+                   SELECT MAX(computed_at) FROM drift_record)""", (f"paper:{primary}%",)))
         new_rows, stake_inputs = [], []
         for fx in fixtures.itertuples(index=False):
             pp = preds.get(primary, {}).get(fx.match_id)
@@ -148,7 +167,8 @@ class PaperEngine:
             odds = snap.match_odds(fx.match_id, "1X2")
             mv = market_view(odds, fx.match_id, "1X2", method=self.s.get("decision.margin_method", "power"), as_of=now,
                              max_staleness_hours=float(self.s.get("point_in_time.max_odds_staleness_hours", 72)))
-            dq, dq_detail = self._match_quality(fx, pp.home_matches or 0, pp.away_matches or 0, overdue, mv)
+            dq, dq_detail = self._match_quality(fx, pp.home_matches or 0, pp.away_matches or 0, overdue, mv,
+                                                match_meta.get(fx.match_id), now)
             ko = kickoff_or_none(fx.kickoff_utc)
             comp = get_competition(fx.competition_id)
             cutoffs = {"match_time": iso(ko) if ko else None, "prediction_timestamp": iso(now), "data_cutoff": iso(now),
@@ -162,11 +182,20 @@ class PaperEngine:
                 ou_odds = snap.match_odds(fx.match_id, "OU")
                 ouv = market_view(ou_odds, fx.match_id, "OU", line=2.5, as_of=now) if len(ou_odds) else None
                 markets += [("OU", "OVER", 2.5, dm.over(2.5), dm.over(2.5), ouv), ("OU", "UNDER", 2.5, dm.under(2.5), dm.under(2.5), ouv)]
+            ou_vals = [DerivedMarkets(preds[n][fx.match_id].matrix).over(2.5) for n in ("poisson_weighted", "dixon_coles")
+                       if n in preds and fx.match_id in preds[n] and preds[n][fx.match_id].matrix is not None]
             for market, sel, line, p_cal, p_raw, view in markets:
                 is_1x2 = market == "1X2"
-                sd_p = pp.sd.get(sel) if (pp.sd and is_1x2) else None
-                sd_m = float(ag.per_selection_sd[SEL_INDEX[sel]]) if is_1x2 and ag.n_models > 1 else None
-                lo, hi, _ = combined_interval(p_cal, sd_p, sd_m)
+                if is_1x2:
+                    sd_p = pp.sd.get(sel) if pp.sd else None
+                    sd_m = float(ag.per_selection_sd[SEL_INDEX[sel]]) if ag.n_models > 1 else None
+                else:   # over/under 2.5: parameter uncertainty + spread across goal models
+                    sd_p = pp.sd.get("OVER25") if pp.sd else None
+                    sd_m = float(np.std(ou_vals)) if len(ou_vals) > 1 else None
+                if sd_p is None and sd_m is None:
+                    lo = hi = None       # never present a point estimate as if it were certain
+                else:
+                    lo, hi, _ = combined_interval(p_cal, sd_p, sd_m)
                 best, book = (view.best(sel) if (view is not None and view.consensus is not None) else (None, None))
                 c = decide(Candidate(
                     match_id=fx.match_id, market=market, selection=sel, line=line, model=primary, model_prob=p_cal,
@@ -176,11 +205,14 @@ class PaperEngine:
                     agreement_diff=ag.max_abs_diff if is_1x2 and ag.n_models > 1 else None,
                     home_matches=pp.home_matches, away_matches=pp.away_matches,
                     market_flags=list(view.flags) if view is not None else ["NO_ODDS"],
-                    calibration_method=(cal_method if is_1x2 else None)), dcfg)
+                    calibration_method=(cal_method if is_1x2 else None), drift_alert=drift_alert,
+                    model_validated_vs_market=validated), dcfg)
                 key = (fx.match_id, market, sel)
                 prev = latest.get(key)
+                prev_payload = json.loads(prev["payload"]) if prev else {}
                 if prev and prev["snapshot_fingerprint"] == snap.fingerprint and prev["model_version"] == versions[primary] \
-                        and json.loads(prev["payload"]).get("odds_fingerprint") == odds_fp:
+                        and prev_payload.get("odds_fingerprint") == odds_fp \
+                        and (prev_payload.get("calibration") or {}).get("run_id") == cal_run:
                     summary["skipped_unchanged"] += 1
                     continue
                 payload = {
@@ -193,7 +225,8 @@ class PaperEngine:
                     "market": {"n_books": view.n_books if view else 0, "margin": view.margin_median if view else None,
                                "flags": view.flags if view else ["NO_ODDS"]},
                     "data_quality": dq_detail, "features_fingerprint": feats.fingerprint,
-                    "reason_text": [REASONS.get(r.split(":")[0], r) for r in c.reasons], "warnings": c.warnings,
+                    "reason_text": [REASONS.get(r.split(":")[0], r) for r in c.reasons],
+                    "warnings": c.warnings + ([] if lo is not None else ["UNCERTAINTY_UNAVAILABLE"]),
                     "ev_conservative": c.ev_conservative, "ev_lower": c.ev_lower,
                 }
                 pid = short_id("pp", fx.match_id, market, sel, iso(now), snap.fingerprint, odds_fp)
@@ -222,6 +255,7 @@ class PaperEngine:
         summary["status_counts"] = pd.Series([r["status"] for r in new_rows]).value_counts().to_dict() if new_rows else {}
         summary["primary_model"] = primary
         summary["calibration"] = cal_method or "none (no validated calibrator yet)"
+        summary["model_validated_vs_market"] = validated
         log_event(log, "paper run", **{k: v for k, v in summary.items() if k != "status_counts"})
         return summary
 

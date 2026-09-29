@@ -114,3 +114,16 @@ def test_monte_carlo_deterministic_and_converges():
     ph = float((a[:, 0] > a[:, 1]).mean())
     assert ph == pytest.approx(DerivedMarkets(m).one_x_two()[0], abs=0.01)
     assert (a >= 0).all()
+
+
+def test_goal_model_intervals_cover_derived_markets(store):
+    snap = store.as_of(pd.Timestamp("2021-01-10", tz="UTC").to_pydatetime())
+    ids = [m for m in store.fixtures()["match_id"] if m.startswith("syn_ITA1_2021")][:4]
+    model = model_factories()["dixon_coles"]()
+    model.fit(snap, ["ITA1"])
+    for p in model.predict(snap.fixtures(ids)):
+        dm = DerivedMarkets(p.matrix)
+        for key, point in (("OVER25", dm.over(2.5)), ("BTTS", dm.btts()), ("H", p.p_home)):
+            lo, hi = p.interval[key]
+            assert lo <= point + 0.02 and point - 0.02 <= hi and hi > lo    # a real interval around the estimate
+            assert p.sd[key] > 0

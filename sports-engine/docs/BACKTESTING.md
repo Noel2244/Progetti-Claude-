@@ -44,10 +44,16 @@ time, snapshot fingerprint, raw + calibrated probabilities, intervals), `per_sea
 
 ## Nested / purged validation
 
-* Hyper-parameters are currently **fixed a priori** from the literature (K=20, xi=0.0019,
-  l2=1, ...), so no tuning touches the test window. The calibration step is already nested
-  (inner train/validation inside the past). A nested hyper-parameter search is the first
-  Research-Lab experiment to add; it must use only seasons before each outer test season.
+* **Nested walk-forward** (`backtesting/nested.py`, `python -m sports_engine nested --param xi_per_day=0,0.001,0.0019,0.003 --outer 2015-2024`):
+  for every outer test season, each candidate is scored by a walk-forward over the
+  `--inner-seasons` seasons before it (data strictly before the outer season); the winner
+  predicts the outer season. Outer seasons inside the final holdout are skipped
+  automatically. Every candidate evaluation is registered (`n_candidates`) in its own
+  experiment family. A test verifies that altering the outer seasons' results leaves the
+  inner choice unchanged.
+* The default model parameters (K=20, xi=0.0019, l2=1, ...) are fixed a priori from the
+  literature, so the standard backtest involves no tuning on its test window; calibration
+  selection is itself nested (inner train/validation inside the past).
 * Purging/embargo: fixtures are scored once, labels (results) become available within hours,
   and training uses only results available before the decision time. Overlapping label
   windows (the reason for purging in finance) do not arise, so no purge is applied. This is

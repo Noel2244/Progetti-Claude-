@@ -207,7 +207,8 @@ class WalkForwardBacktest:
                 preds.loc[cur_idx, ["pc_H", "pc_D", "pc_A"]] = Q
                 preds.loc[cur_idx, "calibration"] = choice.method
                 report[model][int(season)] = {"method": choice.method, "reason": choice.reason,
-                                              "validation_logloss": {k: round(v, 5) for k, v in choice.validation.items()}}
+                                              "validation_logloss": {k: (round(v, 5) if isinstance(v, float) else v)
+                                                                     for k, v in choice.validation.items()}}
         return preds, report
 
     # ------------------------------------------------------------ evaluate

@@ -152,6 +152,34 @@ def cmd_backtest(args):
             "betting": r.betting})
 
 
+def cmd_nested(args):
+    """Nested walk-forward selection of one hyper-parameter; every candidate is counted as an experiment."""
+    s, db = _ctx(args)
+    from sports_engine.backtesting.nested import nested_walk_forward
+    from sports_engine.experiments.registry import ExperimentRegistry, code_version, dataset_fingerprint
+    from sports_engine.models.registry import model_factories
+    from sports_engine.pit.store import HistoricalStore
+    name, values = args.param.split("=")
+    grid = [{name: float(v), "uncertainty": False} for v in values.split(",")]
+    a, b = (int(x) for x in args.outer.split("-"))
+    holdout = date.fromisoformat(s.get("holdout.start_date"))
+    outer = [y for y in range(a, b + 1) if date(y + 1, 6, 30) < holdout]    # never touch the final holdout
+    cv = code_version(s.root)
+    store = HistoricalStore.from_db(db, args.competitions.split(","), with_odds=False)
+    section = args.model if args.model in ("elo", "dixon_coles") else "poisson"
+    res = nested_walk_forward(store, args.competitions.split(","), args.model, grid,
+                              lambda params: model_factories(s, {section: params}), outer, args.inner_seasons)
+    summary = {"outer_logloss": res.outer_logloss, "per_season": res.per_season}
+    eid = ExperimentRegistry(db).record(
+        family=f"nested:{args.model}:{name}", name=f"nested {args.model} {name} {args.outer}",
+        hypothesis=f"choosing {name} by nested walk-forward improves out-of-sample log loss", metrics=summary,
+        dataset_version=dataset_fingerprint(db, args.competitions.split(",")), feature_version=None, code_version=cv,
+        model_version=args.model, hyperparameters={"grid": grid}, random_seed=None,
+        training_period="expanding, before each inner window", validation_period=f"{args.inner_seasons} seasons before each outer season",
+        test_period=f"{outer[0]}..{outer[-1]}" if outer else None, n_candidates=res.n_candidates_evaluated)
+    _print({"experiment_id": eid, **summary, "n_candidates_evaluated": res.n_candidates_evaluated})
+
+
 def _load_result(report_dir: Path):
     rep = json.loads((report_dir / "report.json").read_text(encoding="utf-8"))
     ps = pd.read_csv(report_dir / "per_season.csv") if (report_dir / "per_season.csv").exists() else pd.DataFrame()
@@ -228,9 +256,19 @@ def cmd_daily(args):
     run.run("pit_audit", lambda: {"passed": pit_audit(db)["passed"]}, requires=["ingest"])
     eng = PaperEngine(s, db)
     run.run("paper_reconcile", eng.reconcile, requires=["ingest"])
+    from sports_engine.quality.drift import run_drift_checks
+    run.run("drift", lambda: {"alerts": [r for r in run_drift_checks(db, comps) if r["status"] == "ALERT"]},
+            requires=["ingest"])
     paper = run.run("paper_predict", lambda: eng.run(horizon_days=args.horizon), requires=["ingest"])
     run.run("report", lambda: daily_report(db, s.reports_dir / "daily", paper.output if isinstance(paper.output, dict) else None))
     _print(run.summary())
+
+
+def cmd_drift(args):
+    s, db = _ctx(args)
+    from sports_engine.quality.drift import run_drift_checks
+    rows = run_drift_checks(db, s.get("competitions"))
+    _print(rows)
 
 
 def cmd_report(args):
@@ -324,6 +362,12 @@ def build_parser() -> argparse.ArgumentParser:
     b.add_argument("--family", default="baseline_models"); b.add_argument("--name"); b.add_argument("--bootstrap", type=int, default=1000)
     b.set_defaults(fn=cmd_backtest)
 
+    ns = sub.add_parser("nested", help="nested walk-forward hyper-parameter selection")
+    ns.add_argument("--competitions", default="ITA1"); ns.add_argument("--model", default="dixon_coles")
+    ns.add_argument("--param", required=True, help="e.g. xi_per_day=0,0.001,0.0019,0.003")
+    ns.add_argument("--outer", required=True, help="outer test seasons, e.g. 2015-2024"); ns.add_argument("--inner-seasons", type=int, default=2)
+    ns.set_defaults(fn=cmd_nested)
+
     g = sub.add_parser("gates", help="evaluate promotion gates for a backtest run (runs the leakage suite)")
     g.add_argument("--run-id", required=True); g.add_argument("--model", default="dixon_coles"); g.add_argument("--reference", default="elo")
     g.add_argument("--promote", action="store_true"); g.add_argument("--scope", choices=["probability", "betting"], default="probability")
@@ -338,6 +382,7 @@ def build_parser() -> argparse.ArgumentParser:
     dl = sub.add_parser("daily", help="daily pipeline")
     dl.add_argument("--horizon", type=int, default=None)
     dl.set_defaults(fn=cmd_daily)
+    sub.add_parser("drift", help="league / performance / calibration drift checks").set_defaults(fn=cmd_drift)
     r = sub.add_parser("report", help="reports")
     r.add_argument("kind", choices=["daily", "data-health", "model-health"])
     r.set_defaults(fn=cmd_report)

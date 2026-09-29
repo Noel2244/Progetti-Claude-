@@ -117,6 +117,8 @@ def to_markdown(result: BacktestResult, meta: dict) -> str:
             methods[d["method"]] = methods.get(d["method"], 0) + 1
         L.append(f"- {m}: {methods}")
     L.append("\n## MARKET DATA - paper betting simulation\n")
+    L.append("> Decisions below are *hypothetical*: they assume the model had passed the market-benchmark gate. "
+             "In live paper mode a model that has not passed it cannot produce candidates (MODEL_NOT_VALIDATED_VS_MARKET).\n")
     b = result.betting
     if not b.get("available"):
         L.append(f"- Not available: {b.get('reason')}")

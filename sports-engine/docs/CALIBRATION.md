@@ -22,11 +22,14 @@ toward identity), one-vs-rest isotonic, one-vs-rest Platt. Persisted as JSON (ne
 2. The method is chosen on the **two most recent prior seasons** (validation), trained on
    the seasons before those; then refitted on all prior predictions.
 3. `identity` wins unless another method improves validation log loss by at least
-   **0.002**. Early seasons without two prior seasons stay uncalibrated.
+   **0.002** *and* the paired-bootstrap 95% CI of the per-prediction improvement excludes
+   zero. Early seasons without two prior seasons stay uncalibrated.
 4. The market model is never recalibrated - it is the benchmark.
 
-Why so strict: in the synthetic efficient-market run, a looser rule (0.0005, one validation
-season) selected calibrators that made out-of-sample log loss *worse*. Reports always show
+Why so strict: on synthetic data where the model is correctly specified (so calibration
+can only hurt), a threshold-only rule - first 0.0005 with one validation season, then 0.002
+with two - still selected calibrators that made later seasons *worse* by ~0.002. Requiring
+statistical significance on the validation block fixes the selection noise. Reports always show
 raw and calibrated metrics side by side, and the interpretation says explicitly when
 calibration hurt.
 

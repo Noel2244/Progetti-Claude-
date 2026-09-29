@@ -23,6 +23,7 @@ Linux/macOS: `scripts/*.sh` equivalents, or call `python -m sports_engine <comma
 3. ingest (critical) - contracts, entities, canonical matches, conflicts
 4. quality + point-in-time audit
 5. paper reconcile (results, closing odds, CLV)
+5b. drift checks (league behaviour, live performance, calibration) - an ALERT blocks candidates
 6. paper predict (upcoming `paper.horizon_days`), immutable
 7. daily report (`reports/daily/daily_YYYY-MM-DD.md|html|json|csv`)
 

@@ -111,3 +111,16 @@ def test_risk_limits():
                    "stake_fraction": 0.02, "ev_conservative": 0.1}] * 3
     out = apply_risk_limits(same_match, RiskLimits(max_match_exposure=0.03, max_correlated_exposure=0.03))
     assert sum(s["stake_fraction"] for s in out) == pytest.approx(0.03)
+
+
+def test_team_exposure_is_released_after_settlement():
+    """Regression: team exposure must not accumulate across days (bets settle)."""
+    sels = [{"match_id": f"m{d}", "day": f"2024-01-{d:02d}", "league": "ITA1", "home_team": "same", "away_team": f"x{d}",
+             "stake_fraction": 0.02, "ev_conservative": 0.05} for d in range(1, 11)]
+    out = apply_risk_limits(sels, RiskLimits(max_team_exposure=0.05))
+    assert all(s["stake_fraction"] == pytest.approx(0.02) for s in out)
+
+
+def test_unvalidated_model_cannot_produce_candidates():
+    c = decide(cand(prob_low=0.52, model_validated_vs_market=False), DecisionConfig())
+    assert c.status == DecisionStatus.NO_BET and "MODEL_NOT_VALIDATED_VS_MARKET" in c.reasons

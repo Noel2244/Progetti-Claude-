@@ -37,6 +37,7 @@ REASONS = {
     "LINEUP_UNKNOWN": "lineups not known at decision time (warning; conservative thresholds apply)",
     "MODEL_UNAVAILABLE": "model could not produce a prediction",
     "DRIFT_ALERT": "model/calibration drift alert active",
+    "MODEL_NOT_VALIDATED_VS_MARKET": "the model has not shown out-of-sample information beyond the market (market-benchmark gate not passed), so apparent value is not trusted",
 }
 
 
@@ -84,6 +85,9 @@ class Candidate:
     market_flags: list[str] = field(default_factory=list)
     calibration_method: str | None = None
     drift_alert: bool = False
+    # True only when the model passed the market-benchmark promotion gate (betting-eligible champion).
+    # Backtests set it True to evaluate decisions hypothetically; live paper mode reads the registry.
+    model_validated_vs_market: bool = True
     # outputs
     edge: float | None = None
     ev: float | None = None
@@ -155,6 +159,8 @@ def decide(c: Candidate, cfg: DecisionConfig) -> Candidate:
         hard.append("MODEL_DISAGREEMENT")
     if c.drift_alert:
         hard.append("DRIFT_ALERT")
+    if not c.model_validated_vs_market:
+        hard.append("MODEL_NOT_VALIDATED_VS_MARKET")
     if c.calibration_method is None:
         soft.append("CALIBRATION_UNAVAILABLE")
 

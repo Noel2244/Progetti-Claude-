@@ -166,26 +166,44 @@ class CalibrationChoice:
 
 
 def select_calibrator(P_train, y_train, P_val, y_val, candidates=("identity", "temperature", "dirichlet", "ovr_isotonic"),
-                      min_improvement: float = 0.0005, min_train: int = 600) -> CalibrationChoice:
-    """Pick a calibrator on a *later* validation block; identity unless another wins by ``min_improvement``."""
-    base = log_loss(_clip(P_val), y_val)
+                      min_improvement: float = 0.0005, min_train: int = 600, require_significance: bool = True,
+                      n_boot: int = 500, seed: int = 0) -> CalibrationChoice:
+    """Pick a calibrator on a *later* validation block.
+
+    ``identity`` wins unless another method improves validation log loss by at least
+    ``min_improvement`` AND (when ``require_significance``) the paired-bootstrap 95% CI of
+    the per-prediction improvement excludes zero. A fixed threshold alone proved too
+    permissive: on synthetic data with a correctly specified model it still selected
+    calibrators that made later seasons worse.
+    """
+    from sports_engine.calibration.metrics import log_loss_per_obs, paired_bootstrap
+    y_val = np.asarray(y_val, int)
+    base_obs = log_loss_per_obs(_clip(P_val), y_val)
+    base = float(base_obs.mean())
     scores = {"identity": base}
     if len(y_train) < min_train:
         return CalibrationChoice("identity", IdentityCalibrator(), scores, f"too few training predictions ({len(y_train)})")
-    fitted = {}
+    fitted, per_obs = {}, {}
     for name in candidates:
         if name == "identity":
             continue
         try:
             c = CALIBRATORS[name]().fit(P_train, y_train)
-            scores[name] = log_loss(c.transform(P_val), y_val)
-            fitted[name] = c
-        except Exception as exc:  # a failing calibrator is simply not selected
+            obs = log_loss_per_obs(c.transform(P_val), y_val)
+            scores[name] = float(obs.mean())
+            fitted[name], per_obs[name] = c, obs
+        except Exception:  # a failing calibrator is simply not selected
             scores[name] = float("nan")
     best = min((k for k in scores if k != "identity" and np.isfinite(scores[k])), key=lambda k: scores[k], default=None)
-    if best is not None and scores[best] < base - min_improvement:
-        return CalibrationChoice(best, fitted[best], scores, f"improves validation log loss by {base - scores[best]:.4f}")
-    return CalibrationChoice("identity", IdentityCalibrator(), scores, "no calibrator beat identity by the required margin")
+    if best is None or scores[best] >= base - min_improvement:
+        return CalibrationChoice("identity", IdentityCalibrator(), scores, "no calibrator beat identity by the required margin")
+    if require_significance:
+        bs = paired_bootstrap(per_obs[best], base_obs, n_boot=n_boot, seed=seed)
+        scores["_bootstrap_ci"] = [bs["ci_low"], bs["ci_high"]]
+        if bs["ci_high"] >= 0:
+            return CalibrationChoice("identity", IdentityCalibrator(), scores,
+                                     f"{best} improvement {base - scores[best]:.4f} not significant (CI [{bs['ci_low']:+.4f}, {bs['ci_high']:+.4f}])")
+    return CalibrationChoice(best, fitted[best], scores, f"improves validation log loss by {base - scores[best]:.4f} (significant)")
 
 
 # --------------------------------------------------------------------------- persistence

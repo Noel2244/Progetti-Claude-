@@ -136,8 +136,16 @@ class DerivedMarkets:
         return float((self.matrix.sum(axis=1) * g).sum()), float((self.matrix.sum(axis=0) * g).sum())
 
 
+BATCH_MARKETS = ("H", "D", "A", "OVER25", "BTTS")
+
+
 def one_x_two_batch(lh: np.ndarray, la: np.ndarray, rho: float = 0.0, max_goals: int = 10) -> np.ndarray:
     """Vectorised 1X2 for many (lambda_home, lambda_away) pairs -> array (n, 3) [H, D, A]."""
+    return markets_batch(lh, la, rho, max_goals)[:, :3]
+
+
+def markets_batch(lh: np.ndarray, la: np.ndarray, rho: float = 0.0, max_goals: int = 10) -> np.ndarray:
+    """Vectorised markets for many (lambda_home, lambda_away) pairs -> (n, 5) [H, D, A, OVER25, BTTS]."""
     g = np.arange(max_goals + 1)
     # uncertainty draws can wander into absurd territory; keep expected goals in a football range
     lh = np.clip(np.asarray(lh, float), 0.02, 6.0)
@@ -152,10 +160,14 @@ def one_x_two_batch(lh: np.ndarray, la: np.ndarray, rho: float = 0.0, max_goals:
         m[:, 1, 1] *= 1.0 - rho
         m = np.clip(m, 0.0, None)
     m /= m.sum(axis=(1, 2), keepdims=True)
-    lower = np.tril(np.ones((max_goals + 1, max_goals + 1)), -1)
+    size = max_goals + 1
+    lower = np.tril(np.ones((size, size)), -1)
     home = (m * lower).sum(axis=(1, 2))
     draw = np.trace(m, axis1=1, axis2=2)
-    return np.stack([home, draw, 1.0 - home - draw], axis=1)
+    tot = np.add.outer(np.arange(size), np.arange(size))
+    over25 = (m * (tot > 2.5)).sum(axis=(1, 2))
+    btts = m[:, 1:, 1:].sum(axis=(1, 2))
+    return np.stack([home, draw, 1.0 - home - draw, over25, btts], axis=1)
 
 
 def monte_carlo_scores(matrix: np.ndarray, n: int, seed: int) -> np.ndarray:
