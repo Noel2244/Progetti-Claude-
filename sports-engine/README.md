@@ -21,7 +21,12 @@ successful outputs.
 | Live | immutable, hash-chained paper predictions + reconciliation |
 | Interfaces | CLI, PowerShell scripts, FastAPI + dashboard, Markdown/HTML/JSON/CSV reports |
 
-Results of the latest real walk-forward run are in [`docs/RESULTS.md`](docs/RESULTS.md).
+Headline results ([`docs/RESULTS.md`](docs/RESULTS.md)): on 10,733 out-of-sample Serie A matches
+(1995/96-2024/25) every team model beats league base rates by ~0.08 log loss in all 30
+seasons; Elo (0.982) and Dixon-Coles (0.985) are statistically indistinguishable; draws are
+every model's weak spot. On synthetic markets the engine reports "no edge" in an efficient
+market (fair CLV -3.2%, significant) and detects a planted bias (fair CLV +1.0%, significant)
+while ROI stays inconclusive in both - which is why CLV, not ROI, drives evaluation.
 
 **Important limitation:** no bookmaker odds are included out of the box. The main free
 historical odds source (football-data.co.uk) is for private use and blocks AI agents, so it

@@ -39,16 +39,16 @@ YES - **it is not complete**; this is a working, validated vertical slice plus f
 | Implemented nested validation? | YES | `backtesting/nested.py` + `nested` command (inner walk-forward per outer season, holdout skipped, candidates counted); calibration selection is nested too. Default parameters are fixed a priori. |
 | Protected the final holdout? | YES | clipping + logged, reason-required access. |
 | Accounted for multiple testing? | YES | per-family candidate counts + Bonferroni warning in reports. |
-| Built Champion/Challenger? | YES | registry + gates (`gates` command runs the leakage suite). |
+| Built Champion/Challenger? | YES | registry + gates (`gates` runs the leakage suite). Dixon-Coles promoted as *probability* champion; not betting-eligible (no market benchmark). Elo fails the calibration gate (draw slope 0.75). |
 | Built the Research Lab? | PARTIAL | synthetic known-truth simulator, experiment registry, gates; no automated experiment scheduler. |
 | Built drift detection? | PARTIAL | `quality/drift.py`: league behaviour (home/draw rate, goals), live performance vs backtest expectation, per-selection calibration-in-the-large; runs in `daily`, an ALERT blocks candidates (`DRIFT_ALERT`). Feature/odds-distribution drift not yet implemented; live checks need resolved paper predictions (sample-size guarded). |
-| Created live paper predictions? | YES | 10 upcoming Serie A fixtures predicted on 2026-09-29 (all INSUFFICIENT_DATA: no odds). |
-| Can every prediction be reproduced? | YES | snapshot fingerprint, model version (+param hash), feature version, cutoffs, calibrator run id stored; data rebuildable from the lake. |
+| Created live paper predictions? | YES | 10 upcoming Serie A fixtures x 5 selections, two immutable versions (100 rows, hash chain verified); all INSUFFICIENT_DATA: no odds, champion not betting-eligible. |
+| Can every prediction be reproduced? | YES | snapshot fingerprint, model version (+param hash), feature version, cutoffs, calibrator run id stored; two backtest runs on the same code/data gave bit-identical metrics. |
 | Can every important data point be traced? | YES | match -> source_match -> raw file hash/row -> manifest URL/time/license. |
 | Can the system survive a provider failure? | YES | provider isolation in acquisition, parser-crash isolation in ingestion, task isolation in the daily pipeline (tested). |
 | Can the system operate without paid APIs? | YES | no paid service used. |
 | Can the system run without CUDA? | YES | CPU only. |
-| Did every complex component justify itself? | PARTIAL | Dixon-Coles and weighted Poisson do **not** beat Elo on Serie A 1995-2025 (see RESULTS.md) - reported as such; no ML/ensemble was added. |
+| Did every complex component justify itself? | PARTIAL | On Serie A 1995-2025 Dixon-Coles is not distinguishable from Elo and weighted Poisson is significantly worse (RESULTS.md); Dixon-Coles is kept as champion because it passes calibration and provides score matrices (O/U, BTTS), not because it is more accurate. No ML/ensemble was added. |
 
 ## Other directive items not yet done
 
