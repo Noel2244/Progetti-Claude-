@@ -101,7 +101,8 @@ def to_markdown(result: BacktestResult, meta: dict) -> str:
     L.append("|---|---:|---|---:|---:|")
     for k, c in sorted(result.comparisons.items()):
         L.append(f"| {k} | {c['mean_diff']:+.4f} | [{c['ci_low']:+.4f}, {c['ci_high']:+.4f}] | {c['p_a_better']:.2f} | {c['n']} |")
-    L.append("\nNegative mean diff = first model has lower log loss.\n")
+    L.append("\nNegative mean diff = first model has lower log loss. Comparisons use the probabilities each model "
+             "would actually serve (sequentially calibrated; the market is never recalibrated).\n")
     if not result.per_season.empty:
         L.append("## MODEL OUTPUT - per season (calibrated probabilities, log loss)\n")
         pv = result.per_season.pivot_table(index="season", columns="model", values="log_loss")

@@ -337,8 +337,9 @@ class WalkForwardBacktest:
         log_event(log, "backtest schedule", fixtures=len(sched), batches=int(sched["decision_time"].nunique()))
         preds = self._predict_all(sched)
         preds = preds.merge(sched[["match_id", "is_burn_in", "policy"]], on="match_id", how="left")
-        preds, cal_report = self._calibrate(preds, sched, outcomes)
+        # drop disputed results BEFORE calibration so they can never train a calibrator either
         preds = preds[~preds["match_id"].isin(disputed)].copy()
+        preds, cal_report = self._calibrate(preds, sched, outcomes)
         P = preds[["pc_H", "pc_D", "pc_A"]].to_numpy()
         preds["ll"] = log_loss_per_obs(P, preds["y"].to_numpy().astype(int))
         metrics, per_season, comps = self._evaluate(preds)
