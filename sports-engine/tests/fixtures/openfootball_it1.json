@@ -1,0 +1,6 @@
+{"name": "Synthetic 2008/09", "matches": [
+ {"round": "Matchday 1", "date": "2008-09-13", "time": "20:45", "team1": "Alphaville", "team2": "Betatown Calcio", "score": {"ht": [2, 0], "ft": [3, 1]}},
+ {"round": "Matchday 1", "date": "2008-09-17", "time": "18:30", "team1": "Betatown Calcio", "team2": "Gammacity FC", "score": [1, 2]},
+ {"round": "Matchday 2", "date": "2008-09-21", "time": "15:00", "team1": "Gammacity FC", "team2": "Alphaville", "score": {}},
+ {"round": "Matchday 3", "date": "2099-01-01", "team1": "Alphaville", "team2": "Gammacity FC"}
+]}

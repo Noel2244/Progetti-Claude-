@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sports Research Engine</title>
+<style>
+:root{--bg:#fff;--fg:#1b1f24;--muted:#57606a;--line:#d0d7de;--panel:#f6f8fa;--accent:#0969da;--good:#1a7f37;--warn:#9a6700;--bad:#cf222e}
+@media (prefers-color-scheme: dark){:root{--bg:#0d1117;--fg:#e6edf3;--muted:#8b949e;--line:#30363d;--panel:#161b22;--accent:#4493f8;--good:#3fb950;--warn:#d29922;--bad:#f85149}}
+*{box-sizing:border-box}body{margin:0;font:14px/1.45 system-ui,-apple-system,Segoe UI,sans-serif;background:var(--bg);color:var(--fg)}
+header{padding:10px 16px;border-bottom:1px solid var(--line);display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+header b{font-size:15px}.pill{font-size:12px;padding:2px 8px;border-radius:10px;background:var(--panel);border:1px solid var(--line);color:var(--muted)}
+nav{display:flex;gap:4px;flex-wrap:wrap;padding:8px 16px;border-bottom:1px solid var(--line)}
+nav button{background:none;border:1px solid transparent;color:var(--fg);padding:5px 10px;border-radius:6px;cursor:pointer;font:inherit}
+nav button.on{border-color:var(--line);background:var(--panel)}
+main{padding:12px 16px;max-width:1400px}
+table{border-collapse:collapse;width:100%;font-size:13px;margin:8px 0}th,td{border-bottom:1px solid var(--line);padding:5px 6px;text-align:right;white-space:nowrap}
+th{position:sticky;top:0;background:var(--panel)}td:first-child,th:first-child,td.l,th.l{text-align:left}
+.wrap{overflow-x:auto}.muted{color:var(--muted)}.good{color:var(--good)}.warn{color:var(--warn)}.bad{color:var(--bad)}
+.card{border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin:10px 0;background:var(--panel)}
+.kv{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:6px 16px}
+a{color:var(--accent);cursor:pointer}pre{white-space:pre-wrap;font-size:12px}
+</style>
+</head>
+<body>
+<header><b>Personal Sports Research Engine</b><span class="pill">PAPER MODE</span>
+<span class="muted">Research output, not betting advice. "NO BET" is a valid result.</span></header>
+<nav id="nav"></nav>
+<main id="main">Loading...</main>
+<script>
+const tabs = {
+  "Today / Value": value, "Matches": matchesTab, "Backtests": backtests, "Models & calibration": models,
+  "CLV & paper bankroll": bankroll, "Data health": dataHealth, "Historical coverage": coverage,
+  "Experiments / Research lab": experiments, "System health": health
+};
+const $ = s => document.querySelector(s);
+const esc = v => String(v ?? "-").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const f = (v, d=3) => (v === null || v === undefined || Number.isNaN(v)) ? "-" : (typeof v === "number" ? v.toFixed(d) : esc(v));
+async function j(url){ const r = await fetch(url); if(!r.ok) throw new Error(url+" -> "+r.status); return r.json(); }
+function table(rows, cols, left=[]) {
+  if(!rows || !rows.length) return '<p class="muted">No rows.</p>';
+  const h = cols.map(c => `<th class="${left.includes(c[0])?'l':''}">${esc(c[1]||c[0])}</th>`).join("");
+  const b = rows.map(r => "<tr>"+cols.map(c => `<td class="${left.includes(c[0])?'l':''}">${c[2]?c[2](r[c[0]],r):esc(r[c[0]])}</td>`).join("")+"</tr>").join("");
+  return `<div class="wrap"><table><tr>${h}</tr>${b}</table></div>`;
+}
+const statusCls = s => ({STRONG_CANDIDATE:"good",CANDIDATE:"good",WATCH:"warn",NO_BET:"muted",INSUFFICIENT_DATA:"muted"}[s]||"");
+async function value(){
+  const rows = await j("/value?include_no_bet=true");
+  return `<div class="card">Latest version of each paper prediction for upcoming matches. Every NO BET lists its reasons.</div>` +
+    table(rows, [["kickoff_utc","Kickoff UTC"],["match","Match",(v,r)=>`<a onclick="showMatch('${esc(r.match_id)}')">${esc(v)}</a>`],
+      ["market"],["selection","Sel"],["odds","Odds",v=>f(v,2)],["model_prob","Model p",v=>f(v)],
+      ["prob_low","Low",v=>f(v)],["prob_high","High",v=>f(v)],["fair_prob","Market p",v=>f(v)],["edge","Edge",v=>f(v)],
+      ["ev","EV",v=>f(v)],["data_quality","DQ",v=>f(v,2)],["status","Status",v=>`<span class="${statusCls(v)}">${esc(v)}</span>`],
+      ["reasons","Reasons",v=>esc((v||[]).join(", "))]], ["match","status","reasons","market","selection","kickoff_utc"]);
+}
+async function matchesTab(){
+  const rows = await j("/matches?limit=300");
+  return table(rows, [["match_date","Date"],["home","Home"],["away","Away"],["home_goals","HG"],["away_goals","AG"],["status"],
+    ["timestamp_quality","Time"],["n_sources","Src"],["score_disputed","Disputed"],["match_id","",(v)=>`<a onclick="showMatch('${esc(v)}')">open</a>`]],
+    ["match_date","home","away","status","timestamp_quality"]);
+}
+async function showMatch(id){
+  const d = await j("/matches/"+encodeURIComponent(id));
+  const m = d.match;
+  let html = `<h2>${esc(m.home)} v ${esc(m.away)}</h2><div class="kv"><div>Competition: ${esc(m.competition_id)} ${esc(m.season)}</div>
+    <div>Kickoff: ${esc(m.kickoff_utc || m.match_date + " (date only)")}</div><div>Status: ${esc(m.status)}</div>
+    <div>Score: ${esc(m.home_goals)}-${esc(m.away_goals)}</div><div>Sources: ${esc(m.sources)}</div><div>Conflict: ${m.has_conflict?'<span class="warn">yes</span>':'no'}</div></div>`;
+  if(d.score_matrix){
+    const g = d.score_matrix.home_rows_away_cols, L = d.score_matrix.labels;
+    html += `<h3>Score matrix (rows = home goals, cols = away goals)</h3><div class="wrap"><table><tr><th></th>${L.map(x=>`<th>${x}</th>`).join("")}</tr>`+
+      g.map((row,i)=>`<tr><th>${L[i]}</th>${row.map(v=>`<td>${(v*100).toFixed(1)}%</td>`).join("")}</tr>`).join("")+`</table></div>`;
+  }
+  const pp = d.paper_predictions.slice(-8).reverse();
+  html += `<h3>Paper predictions (latest first)</h3>` + table(pp, [["prediction_timestamp","At"],["market"],["selection","Sel"],
+    ["model_prob","Model p",v=>f(v)],["market_prob","Market p",v=>f(v)],["odds","Odds",v=>f(v,2)],["ev","EV",v=>f(v)],["status"],
+    ["reasons","Reasons",v=>esc((v||[]).join(", "))]], ["prediction_timestamp","market","selection","status","reasons"]);
+  if(pp.length){ const pl = pp[0].payload; html += `<div class="card"><b>Models</b><pre>${esc(JSON.stringify(pl.models,null,1))}</pre>
+     <b>Agreement</b> ${esc(JSON.stringify(pl.agreement))} &nbsp; <b>Market</b> ${esc(JSON.stringify(pl.market))}<br><b>Why</b> ${esc((pl.reason_text||[]).join(" | "))}
+     <br><b>Cutoffs</b> ${esc(JSON.stringify(pl.cutoffs))}</div>`; }
+  html += `<h3>Sources</h3>` + table(d.sources, [["source"],["home_team_raw","Home (raw)"],["away_team_raw","Away (raw)"],["home_goals","HG"],["away_goals","AG"],["kickoff_utc"],["timestamp_quality"]], ["source","home_team_raw","away_team_raw","kickoff_utc","timestamp_quality"]);
+  if(d.conflicts.length) html += `<h3>Conflicts</h3>` + table(d.conflicts, [["field"],["source_a"],["value_a"],["source_b"],["value_b"],["resolution"],["resolution_reason"]], ["field","source_a","source_b","resolution","resolution_reason"]);
+  if(d.odds.length) html += `<h3>Odds history</h3>` + table(d.odds, [["available_at"],["bookmaker"],["market"],["selection"],["line"],["odds",null,v=>f(v,2)],["snapshot_type"],["timestamp_quality"]], ["available_at","bookmaker","market","selection","snapshot_type","timestamp_quality"]);
+  $("#main").innerHTML = html;
+}
+async function backtests(){
+  const rows = await j("/backtests");
+  return rows.map(r => `<div class="card"><b>${esc(r.run_id)}</b> <span class="muted">${esc(r.created_at)} - experiment ${esc(r.experiment_id)}</span>
+    ${table(Object.entries(r.summary).filter(([k])=>k!=="betting").map(([k,v])=>({model:k,...v})), [["model"],["n"],["log_loss","Log loss",v=>f(v,4)],["brier","Brier",v=>f(v,4)],["rps","RPS",v=>f(v,4)],["ece_mean","ECE",v=>f(v,4)]],["model"])}
+    <ul>${(r.interpretation||[]).map(x=>`<li>${esc(x)}</li>`).join("")}</ul></div>`).join("") || '<p class="muted">No backtests yet.</p>';
+}
+async function models(){ const d = await j("/models"); return `<h3>Registry</h3>${table(d.registry,[["model_key"],["role"],["gates_passed","Gates",v=>esc(JSON.stringify(v))],["updated_at"]],["model_key","role","gates_passed"])}
+  <h3>Live calibrators</h3><pre>${esc(JSON.stringify(d.calibrators,null,1))}</pre>`; }
+async function bankroll(){ const [b,c] = await Promise.all([j("/bankroll"), j("/clv")]); return `<div class="card"><pre>${esc(JSON.stringify(b,null,1))}</pre></div><h3>CLV by market</h3>${table(c,[["market"],["competition_id"],["n"],["mean_clv_price",null,v=>f(v,4)],["mean_clv_fair",null,v=>f(v,4)]],["market","competition_id"])}`; }
+async function dataHealth(){ const d = await j("/data-health"); return `<div class="card kv">${["matches","newest_result","overdue_results","open_entity_reviews","conflicts","ingestion_errors"].map(k=>`<div>${k}: <b>${esc(d[k])}</b></div>`).join("")}</div>
+  <h3>Providers</h3>${table(d.providers,[["provider"],["status"],["message"],["checked_at"]],["provider","status","message","checked_at"])}
+  <h3>Last pipeline tasks</h3>${table(d.last_pipeline,[["task"],["status"],["finished_at"]],["task","status","finished_at"])}`; }
+async function coverage(){ const [rows, h] = await Promise.all([j("/coverage"), j("/historical-data")]);
+  return `<div class="card kv">${["total_matches","total_seasons","total_teams","total_bookmakers","total_odds_snapshots","total_xg_records","oldest_data","newest_result","best_covered_competition","worst_covered_competition"].map(k=>`<div>${k}: <b>${esc(h[k])}</b></div>`).join("")}</div>` +
+  table(rows.slice().reverse(), [["competition"],["season"],["state"],["matches"],["results_pct","Results",v=>f(v,2)],["odds_1x2_prematch_pct","Odds",v=>f(v,2)],["closing_odds_pct","Closing",v=>f(v,2)],["bookmakers"],["xg_pct","xG",v=>f(v,2)],["exact_kickoff_pct","Exact KO",v=>f(v,2)],["multi_source_pct","Multi-src",v=>f(v,2)],["pit_capability","PIT"]],["competition","season","state","pit_capability"]); }
+async function experiments(){ const [e, r] = await Promise.all([j("/experiments"), j("/research-lab")]); return `<div class="card"><b>Pipeline</b> ${esc(r.pipeline)}<br><b>Holdout starts</b> ${esc(r.holdout_start)}<ul>${r.rules.map(x=>`<li>${esc(x)}</li>`).join("")}</ul></div>
+  <pre>${esc(JSON.stringify(e.stats,null,1))}</pre>${table(e.recent,[["created_at"],["family"],["name"],["n_candidates","Candidates"],["used_holdout","Holdout"],["code_version"]],["created_at","family","name","code_version"])}`; }
+async function health(){ const h = await j("/health"); return `<div class="card"><pre>${esc(JSON.stringify(h,null,1))}</pre></div>`; }
+function render(name){ document.querySelectorAll("nav button").forEach(b=>b.classList.toggle("on", b.textContent===name));
+  $("#main").innerHTML = "Loading..."; tabs[name]().then(h => $("#main").innerHTML = h).catch(e => $("#main").innerHTML = `<p class="bad">${esc(e.message)}</p>`); }
+$("#nav").innerHTML = Object.keys(tabs).map(k=>`<button>${k}</button>`).join("");
+document.querySelectorAll("nav button").forEach(b => b.onclick = () => render(b.textContent));
+render("Today / Value");
+</script>
+</body>
+</html>

@@ -1,0 +1,122 @@
+# Personal Sports Research Engine - main configuration.
+# Relative paths are resolved against the project root (the folder holding this file).
+# Secrets never go here: use a local .env file (see .env.example).
+
+mode: paper                 # the ONLY mode. Real-money execution does not exist in this codebase.
+
+paths:
+  data_dir: data
+  database: data/sports_engine.sqlite
+  reports_dir: reports
+  models_dir: models
+
+http:
+  # Honest, identifying user agent. Never impersonate a browser or another bot.
+  user_agent: "sports-engine/0.1 (private non-commercial personal research)"
+  respect_robots_txt: true
+  timeout_seconds: 60
+  max_retries: 4
+  max_download_mb: 250
+
+providers:
+  engsoccerdata:
+    enabled: true
+    min_interval_seconds: 1.0
+  openfootball:
+    enabled: true
+    min_interval_seconds: 1.0
+  statsbomb:
+    enabled: true
+    min_interval_seconds: 1.0
+    download_events: false        # events are ~3 MB per match; opt-in
+  football_data:
+    # football-data.co.uk: free for PRIVATE individuals, for league match prediction only.
+    # NOT for commercial products or AI/data-training products. See docs/LICENSES.md.
+    # Opt-in: you must read the terms and set both flags yourself.
+    enabled: false
+    terms_acknowledged: false
+    min_interval_seconds: 3.0
+    first_season: 1993
+  local_csv:
+    enabled: true
+    inbox: data/inbox
+
+# Competitions in scope. The vertical slice starts with Serie A only.
+competitions: [ITA1]
+expansion_competitions: [ENG1, ESP1, GER1, FRA1, UCL]
+
+# Source priority used when sources disagree (lower index wins). Conflicts are always recorded.
+source_priority:
+  results: [statsbomb, football_data, openfootball, engsoccerdata, local_csv]
+  # statsbomb kick_off timezones proved inconsistent (see docs/HISTORICAL_DATA_INVENTORY.md)
+  kickoff: [football_data, openfootball, local_csv, statsbomb, engsoccerdata]
+
+point_in_time:
+  result_buffer_hours_league: 3.0        # result known kickoff + buffer (exact kickoff)
+  result_buffer_hours_cup: 4.0
+  # date-only matches: result known at 00:00 local time of the following day
+  prediction_lead_minutes: 60            # default decision time = kickoff - lead (exact kickoff)
+  max_odds_staleness_hours: 72
+
+holdout:
+  # Final holdout. Backtests refuse to evaluate on or after this date unless
+  # explicitly requested; every access is logged in the experiment registry.
+  start_date: "2025-07-01"
+
+models:
+  elo:
+    k: 20.0
+    home_advantage: 65.0
+    season_regression: 0.20
+    new_team_quantile: 0.20
+    goal_diff_multiplier: true
+    link_window_days: 3650
+  poisson:
+    xi_per_day: 0.0019          # Dixon-Coles style exponential time decay (~0.0065 per half-week)
+    window_days: 1095
+    l2: 1.0
+    max_goals: 10
+    min_team_matches: 6
+  dixon_coles:
+    xi_per_day: 0.0019
+    window_days: 1095
+    l2: 1.0
+    max_goals: 10
+    min_team_matches: 6
+
+calibration:
+  candidates: [identity, temperature, dirichlet, ovr_isotonic]
+  min_train_predictions: 600
+  min_improvement_logloss: 0.002
+
+decision:
+  margin_method: power            # multiplicative | additive | power | shin | odds_ratio
+  min_edge: 0.02
+  min_ev: 0.03
+  shrink_to_market: 0.5           # conservative probability = market + k * (model - market)
+  max_model_disagreement: 0.08    # max pairwise |p| difference among statistical models
+  min_data_quality: 0.60
+  min_team_matches: 8
+  min_odds: 1.30
+  max_odds: 6.00
+  strong_requires_positive_ev_lower: true
+
+staking:
+  method: fractional_kelly        # fixed | fractional_kelly
+  unit_fraction: 0.01             # fixed method: 1% of bankroll
+  kelly_fraction: 0.25
+  max_stake_fraction: 0.02
+
+risk:
+  max_single_exposure: 0.02
+  max_daily_exposure: 0.10
+  max_match_exposure: 0.03
+  max_team_exposure: 0.05
+  max_league_exposure: 0.08
+  max_correlated_exposure: 0.04
+  max_slip_legs: 5
+
+paper:
+  starting_bankroll: 1000.0
+  horizon_days: 7
+  min_minutes_before_kickoff: 30

@@ -1,0 +1,59 @@
+# Curated canonical Italian clubs. Aliases are matched case-insensitively and
+# apply to every source. Club *lineages* (re-foundations, historical names) are
+# deliberately mapped to one entity - documented in docs/DATA_MODEL.md.
+# An alias may belong to exactly one team (collisions fail loudly at load time).
+country: ITA
+teams:
+  ita-inter: {name: Inter, aliases: [Inter, FC Internazionale Milano, Internazionale, Inter Milan, FC Internazionale, Ambrosiana-Inter]}
+  ita-milan: {name: AC Milan, aliases: [AC Milan, Milan]}
+  ita-juventus: {name: Juventus, aliases: [Juventus, Juventus FC]}
+  ita-roma: {name: AS Roma, aliases: [AS Roma, Roma]}
+  ita-lazio: {name: Lazio, aliases: [Lazio, Lazio Roma, SS Lazio]}
+  ita-napoli: {name: Napoli, aliases: [SSC Napoli, Napoli]}
+  ita-atalanta: {name: Atalanta, aliases: [Atalanta, Atalanta BC]}
+  ita-fiorentina: {name: Fiorentina, aliases: [ACF Fiorentina, Fiorentina]}
+  ita-torino: {name: Torino, aliases: [Torino FC, Torino]}
+  ita-bologna: {name: Bologna, aliases: [Bologna FC, Bologna FC 1909, Bologna]}
+  ita-udinese: {name: Udinese, aliases: [Udinese Calcio, Udinese]}
+  ita-sampdoria: {name: Sampdoria, aliases: [Sampdoria, UC Sampdoria]}
+  ita-genoa: {name: Genoa, aliases: [Genoa CFC, Genoa, Genova 1893 Circolo del Calcio]}
+  ita-hellas-verona: {name: Hellas Verona, aliases: [Hellas Verona, Hellas Verona FC, Verona]}
+  ita-chievo: {name: Chievo, aliases: [Chievo Verona, Chievo, AC ChievoVerona]}
+  ita-sassuolo: {name: Sassuolo, aliases: [Sassuolo Calcio, US Sassuolo Calcio, Sassuolo]}
+  ita-cagliari: {name: Cagliari, aliases: [Cagliari Calcio, Cagliari]}
+  ita-empoli: {name: Empoli, aliases: [Empoli FC, Empoli]}
+  ita-parma: {name: Parma, aliases: [Parma AC, Parma FC, Parma Calcio 1913, Parma]}
+  ita-lecce: {name: Lecce, aliases: [US Lecce, Lecce]}
+  ita-salernitana: {name: Salernitana, aliases: [Salernitana Calcio 1919, US Salernitana 1919, Salernitana Sport, Salernitana]}
+  ita-spezia: {name: Spezia, aliases: [Spezia Calcio, Spezia]}
+  ita-venezia: {name: Venezia, aliases: [AC Venezia, Venezia FC, Venezia]}
+  ita-monza: {name: Monza, aliases: [AC Monza, Monza]}
+  ita-cremonese: {name: Cremonese, aliases: [US Cremonese, Cremonese]}
+  ita-frosinone: {name: Frosinone, aliases: [Frosinone Calcio, Frosinone]}
+  ita-como: {name: Como, aliases: [Como Calcio, Como 1907, Como]}
+  ita-pisa: {name: Pisa, aliases: [Pisa SC, AC Pisa 1909, Pisa]}
+  ita-palermo: {name: Palermo, aliases: [US Palermo, Palermo, Palermo FC]}
+  ita-brescia: {name: Brescia, aliases: [Brescia Calcio, Brescia]}
+  ita-benevento: {name: Benevento, aliases: [Benevento, Benevento Calcio]}
+  ita-crotone: {name: Crotone, aliases: [FC Crotone, Crotone]}
+  ita-spal: {name: SPAL, aliases: [SPAL 1907 Ferrara, SPAL 2013 Ferrara, SPAL, Spal]}
+  ita-carpi: {name: Carpi, aliases: [Carpi FC, Carpi]}
+  ita-pescara: {name: Pescara, aliases: [Pescara Calcio, Delfino Pescara, Pescara]}
+  ita-cesena: {name: Cesena, aliases: [AC Cesena, Cesena]}
+  ita-catania: {name: Catania, aliases: [Calcio Catania, Catania]}
+  ita-livorno: {name: Livorno, aliases: [AS Livorno, US Livorno, Livorno]}
+  ita-siena: {name: Siena, aliases: [AC Siena, Siena]}
+  ita-bari: {name: Bari, aliases: [AS Bari, Bari]}
+  ita-novara: {name: Novara, aliases: [Novara Calcio, Novara]}
+  ita-reggina: {name: Reggina, aliases: [Reggina Calcio, Reggina]}
+  ita-messina: {name: Messina, aliases: [FC Messina, A.C.R. Messina, Messina]}
+  ita-ascoli: {name: Ascoli, aliases: [Ascoli Calcio, Ascoli]}
+  ita-treviso: {name: Treviso, aliases: [Treviso FBC, Treviso]}
+  ita-piacenza: {name: Piacenza, aliases: [Piacenza Calcio, Piacenza]}
+  ita-modena: {name: Modena, aliases: [Modena FC, Modena]}
+  ita-perugia: {name: Perugia, aliases: [AC Perugia, Perugia]}
+  ita-ancona: {name: Ancona, aliases: [Ancona Calcio, US Anconitana, Ancona]}
+  ita-vicenza: {name: Vicenza, aliases: [Vicenza Calcio, Lanerossi Vicenza, Vicenza]}
+  ita-reggiana: {name: Reggiana, aliases: [AC Reggiana, Reggiana]}
+  ita-foggia: {name: Foggia, aliases: [US Foggia, Foggia]}
+  ita-padova: {name: Padova, aliases: [Calcio Padova, Padova]}

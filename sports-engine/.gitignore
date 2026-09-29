@@ -1,0 +1,34 @@
+# --- data: third-party raw data must NEVER be committed or redistributed ---
+data/*
+!data/README.md
+!data/.gitkeep
+
+# local artefacts
+models/*
+!models/README.md
+reports/logs/
+reports/daily/
+reports/coverage/
+reports/pit_audit.json
+reports/backtests/*/predictions.csv
+reports/backtests/*/bets.csv
+
+# secrets
+.env
+*.pem
+*.key
+
+# python / tooling
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.hypothesis/
+.mypy_cache/
+.ruff_cache/
+dist/
+build/
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm

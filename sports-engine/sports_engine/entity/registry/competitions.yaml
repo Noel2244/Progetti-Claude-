@@ -1,0 +1,92 @@
+# Canonical competition registry with per-source codes.
+# season_style: split = "2024-2025" seasons (Aug-May); calendar = "2024".
+competitions:
+  ITA1:
+    name: Serie A
+    country: ITA
+    tier: 1
+    type: league
+    timezone: Europe/Rome
+    season_style: split
+    sources:
+      football_data: I1
+      openfootball: it.1
+      engsoccerdata: {file: italy, tier: 1}
+      statsbomb: 12
+  ENG1:
+    name: Premier League
+    country: ENG
+    tier: 1
+    type: league
+    timezone: Europe/London
+    season_style: split
+    sources:
+      football_data: E0
+      openfootball: en.1
+      engsoccerdata: {file: england, tier: 1}
+      statsbomb: 2
+  ESP1:
+    name: La Liga
+    country: ESP
+    tier: 1
+    type: league
+    timezone: Europe/Madrid
+    season_style: split
+    sources:
+      football_data: SP1
+      openfootball: es.1
+      engsoccerdata: {file: spain, tier: 1}
+      statsbomb: 11
+  GER1:
+    name: Bundesliga
+    country: GER
+    tier: 1
+    type: league
+    timezone: Europe/Berlin
+    season_style: split
+    sources:
+      football_data: D1
+      openfootball: de.1
+      engsoccerdata: {file: germany, tier: 1}
+      statsbomb: 9
+  FRA1:
+    name: Ligue 1
+    country: FRA
+    tier: 1
+    type: league
+    timezone: Europe/Paris
+    season_style: split
+    sources:
+      football_data: F1
+      openfootball: fr.1
+      engsoccerdata: {file: france, tier: 1}
+      statsbomb: 7
+  UCL:
+    name: UEFA Champions League
+    country: EUR
+    tier: 0
+    type: cup
+    timezone: Europe/Zurich
+    season_style: split
+    sources:
+      openfootball: uefa.cl
+      engsoccerdata: {file: champs}
+      statsbomb: 16
+  UEL:
+    name: UEFA Europa League
+    country: EUR
+    tier: 0
+    type: cup
+    timezone: Europe/Zurich
+    season_style: split
+    sources:
+      openfootball: uefa.el
+  UECL:
+    name: UEFA Conference League
+    country: EUR
+    tier: 0
+    type: cup
+    timezone: Europe/Zurich
+    season_style: split
+    sources:
+      openfootball: uefa.conf
