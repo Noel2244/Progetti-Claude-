@@ -384,4 +384,8 @@ def summarise_bets(bets: pd.DataFrame) -> dict:
         idx = rng.integers(0, len(arr), size=(2000, len(arr)))
         ys = arr[idx, 0].sum(axis=1) / arr[idx, 1].sum(axis=1)
         out["yield_ci95"] = [float(np.percentile(ys, 2.5)), float(np.percentile(ys, 97.5))]
+        clv = placed["clv_fair"].dropna().to_numpy(float)
+        if len(clv) >= 10:   # CLV converges much faster than P/L - report its uncertainty too
+            cb = rng.choice(clv, size=(2000, len(clv))).mean(axis=1)
+            out["clv_fair_ci95"] = [float(np.percentile(cb, 2.5)), float(np.percentile(cb, 97.5))]
     return out

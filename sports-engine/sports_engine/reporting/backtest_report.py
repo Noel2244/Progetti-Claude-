@@ -57,7 +57,14 @@ def interpret(result: BacktestResult) -> list[str]:
         else:
             out.append(f"Paper betting: {b['bets']} bets, yield {b['yield']:+.1%}, 95% CI [{lo:+.1%}, {hi:+.1%}] includes zero -> no evidence of an edge.")
         if b.get("mean_clv_fair") is not None:
-            out.append(f"Mean fair CLV {b['mean_clv_fair']:+.2%} (EV of the taken prices at the fair closing probability).")
+            ci = b.get("clv_fair_ci95")
+            verdict = ""
+            if ci:
+                verdict = (" - significantly positive: prices beat the fair close" if ci[0] > 0 else
+                           " - significantly negative: the taken prices were worse than the fair close" if ci[1] < 0 else
+                           " - not distinguishable from zero")
+            out.append(f"Mean fair CLV {b['mean_clv_fair']:+.2%}" + (f" (95% CI [{ci[0]:+.2%}, {ci[1]:+.2%}])" if ci else "")
+                       + verdict + ". Price CLV against the same book can look positive merely from line-shopping noisy quotes; fair CLV is the honest measure.")
     elif b.get("available"):
         out.append("The abstention engine produced no bets in this window: 'NO BET' throughout.")
     return out
